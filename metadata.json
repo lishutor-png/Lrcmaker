@@ -1,0 +1,6 @@
+{
+  "name": "Lishrik Studio",
+  "description": "Aplikasi pembuat file LRC dengan sinkronisasi lirik manual presisi, penataan metadata vertikal, alur satu lagu aktif, dan ekspor .lrc",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
