@@ -7,7 +7,8 @@ import java.util.UUID
 data class LyricLine(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
-    val timestampMs: Long? = null
+    val timestampMs: Long? = null,
+    val isInstrumental: Boolean = false
 )
 
 data class SongInfo(
@@ -33,6 +34,8 @@ data class LocalAudioTrack(
 )
 
 object LrcUtils {
+
+    const val INSTRUMENTAL_TEXT = "♪ (Musik / Jeda Instrumental) ♪"
 
     /**
      * Formats milliseconds into standard LRC timestamp format: [mm:ss.xx]
@@ -94,9 +97,19 @@ object LrcUtils {
                 val fracMs = if (fracStr.length == 2) frac * 10 else frac
                 val totalMs = (min * 60 + sec) * 1000 + fracMs
                 val lyricText = match.groupValues[4].trim()
-                result.add(LyricLine(text = lyricText, timestampMs = totalMs))
+                val isInst = lyricText.isEmpty() || lyricText.contains("♪") || lyricText.contains("instrumental", ignoreCase = true)
+                result.add(LyricLine(
+                    text = if (lyricText.isEmpty()) INSTRUMENTAL_TEXT else lyricText,
+                    timestampMs = totalMs,
+                    isInstrumental = isInst
+                ))
             } else {
-                result.add(LyricLine(text = trimmed, timestampMs = null))
+                val isInst = trimmed.contains("♪") || trimmed.contains("instrumental", ignoreCase = true)
+                result.add(LyricLine(
+                    text = trimmed,
+                    timestampMs = null,
+                    isInstrumental = isInst
+                ))
             }
         }
         return result
@@ -120,7 +133,8 @@ object LrcUtils {
     }
 
     /**
-     * Generates standard, clean LRC string with metadata headers and ordered timestamps
+     * Generates standard, clean LRC string with metadata headers and ordered timestamps.
+     * Note: for empty instrumental lines, standard LRC format is [mm:ss.xx] or [mm:ss.xx]♪
      */
     fun generateLrc(
         songInfo: SongInfo,
@@ -155,7 +169,12 @@ object LrcUtils {
             } else {
                 "[00:00.00]"
             }
-            sb.appendLine("$tag${line.text}")
+            val textToOutput = if (line.isInstrumental && (line.text == INSTRUMENTAL_TEXT || line.text.isBlank())) {
+                "" // Standard empty line in LRC to clear lyrics during instrumental music
+            } else {
+                line.text
+            }
+            sb.appendLine("$tag$textToOutput")
         }
 
         return sb.toString().trimEnd()

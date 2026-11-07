@@ -73,7 +73,6 @@ import com.example.ui.theme.StudioTextSecondary
 fun SetupScreen(
     songInfo: SongInfo,
     lyrics: List<LyricLine>,
-    onLoadDemo: () -> Unit,
     onLoadAudioUri: (Uri, String?, String?) -> Unit,
     onOpenLocalMusicDialog: () -> Unit,
     onUpdateMetadata: (String, String, String) -> Unit,
@@ -417,24 +416,6 @@ fun SetupScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Pilih Berkas", fontSize = 12.sp, maxLines = 1)
                     }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedButton(
-                    onClick = onLoadDemo,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("load_demo_song_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = StudioIndigo,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Gunakan Lagu Contoh (Demo Track)", fontSize = 13.sp)
                 }
             }
         }

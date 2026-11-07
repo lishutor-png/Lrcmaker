@@ -295,14 +295,26 @@ fun PreviewScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                             }
 
-                            Text(
-                                text = line.text,
-                                fontSize = if (isActive) 21.sp else 16.sp,
-                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                color = textColor,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(0.9f)
-                            )
+                            if (line.isInstrumental) {
+                                Text(
+                                    text = "♪ Musik Instrumental ♪",
+                                    fontSize = if (isActive) 18.sp else 14.sp,
+                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isActive) StudioCyan else StudioTextMuted,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(0.9f)
+                                )
+                            } else {
+                                Text(
+                                    text = line.text,
+                                    fontSize = if (isActive) 21.sp else 16.sp,
+                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                                    color = textColor,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(0.9f)
+                                )
+                            }
                         }
                     }
                 }

@@ -24,11 +24,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Speed
@@ -83,12 +86,14 @@ fun SyncStudioScreen(
     isPlaying: Boolean,
     playbackSpeed: Float,
     currentSyncIndex: Int,
+    lastStampedIndex: Int? = null,
     onPlayPause: () -> Unit,
     onSeek: (Long) -> Unit,
     onSkipBackward: () -> Unit,
     onSkipForward: () -> Unit,
     onSetPlaybackSpeed: (Float) -> Unit,
     onStampCurrentLine: () -> Unit,
+    onInsertInstrumentalBreak: () -> Unit,
     onSelectSyncIndex: (Int) -> Unit,
     onNudgeTimestamp: (Int, Long) -> Unit,
     onClearTimestamp: (Int) -> Unit,
@@ -106,6 +111,7 @@ fun SyncStudioScreen(
 
     val currentLine = lyrics.getOrNull(currentSyncIndex)
     val nextLine = lyrics.getOrNull(currentSyncIndex + 1)
+    val lastStampedLine = lastStampedIndex?.let { lyrics.getOrNull(it) }
     val syncedCount = lyrics.count { it.timestampMs != null }
 
     Column(
@@ -331,10 +337,71 @@ fun SyncStudioScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Current Active Lyric Text (Prominent)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Prior Stamped Line Display (Membantu user melihat baris yang baru saja dipilih / selesai di-timestamp)
+                if (lastStampedLine != null && lastStampedIndex != null) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, StudioGreen.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = StudioGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Baris terakhir yang ditandai (#${lastStampedIndex + 1}):",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = StudioGreen
+                                )
+                                Text(
+                                    text = lastStampedLine.text,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (lastStampedLine.timestampMs != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = StudioGreen.copy(alpha = 0.2f),
+                                    modifier = Modifier.padding(start = 6.dp)
+                                ) {
+                                    Text(
+                                        text = LrcUtils.formatDisplayTime(lastStampedLine.timestampMs),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = StudioGreen,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Current Active Target Lyric Text (Prominent)
                 Text(
                     text = currentLine?.text ?: "Semua baris selesai disinkronkan!",
-                    fontSize = 19.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -347,7 +414,7 @@ fun SyncStudioScreen(
                 if (nextLine != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Berikutnya: ${nextLine.text}",
+                        text = "Baris Berikutnya: ${nextLine.text}",
                         style = MaterialTheme.typography.bodySmall,
                         color = StudioTextMuted,
                         textAlign = TextAlign.Center,
@@ -368,7 +435,7 @@ fun SyncStudioScreen(
                         containerColor = StudioCoral,
                         disabledContainerColor = StudioCoral.copy(alpha = 0.3f)
                     ),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("stamp_time_button")
@@ -397,6 +464,43 @@ fun SyncStudioScreen(
                                 color = Color.White.copy(alpha = 0.85f)
                             )
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // TOMBOL JEDA MUSIK INSTRUMENTAL (Saat lagu cuma musik / jeda antar bait)
+                OutlinedButton(
+                    onClick = onInsertInstrumentalBreak,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = StudioIndigo
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, StudioIndigo.copy(alpha = 0.6f)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("insert_instrumental_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = StudioIndigo
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Text(
+                            text = "+ Jeda Musik Instrumental",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = StudioIndigo
+                        )
+                        Text(
+                            text = "Gunakan saat lagu sedang musik saja tanpa nyanyian (${LrcUtils.formatDisplayTime(currentPositionMs)})",
+                            fontSize = 10.sp,
+                            color = StudioTextSecondary
+                        )
                     }
                 }
 
@@ -528,14 +632,34 @@ fun SyncStudioScreen(
 
                         // Lyric Text
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = line.text,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isCurrentTarget) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isCurrentTarget) MaterialTheme.colorScheme.onSurface else StudioTextSecondary,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            if (line.isInstrumental) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = StudioIndigo,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = line.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = StudioIndigo,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = line.text,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isCurrentTarget) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isCurrentTarget) MaterialTheme.colorScheme.onSurface else StudioTextSecondary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(6.dp))

@@ -71,6 +71,7 @@ fun LrcStudioApp(viewModel: LrcStudioViewModel = viewModel()) {
     val isPlaying by viewModel.isPlaying.collectAsState()
     val playbackSpeed by viewModel.playbackSpeed.collectAsState()
     val currentSyncIndex by viewModel.currentSyncIndex.collectAsState()
+    val lastStampedIndex by viewModel.lastStampedIndex.collectAsState()
     val activePreviewIndex by viewModel.activePreviewIndex.collectAsState()
 
     val showMusicDialog by viewModel.showMusicLibraryDialog.collectAsState()
@@ -151,7 +152,6 @@ fun LrcStudioApp(viewModel: LrcStudioViewModel = viewModel()) {
                     SetupScreen(
                         songInfo = songInfo,
                         lyrics = lyrics,
-                        onLoadDemo = { viewModel.loadDemoSong() },
                         onLoadAudioUri = { uri, title, artist ->
                             viewModel.loadCustomAudio(uri, title, artist)
                         },
@@ -176,12 +176,14 @@ fun LrcStudioApp(viewModel: LrcStudioViewModel = viewModel()) {
                         isPlaying = isPlaying,
                         playbackSpeed = playbackSpeed,
                         currentSyncIndex = currentSyncIndex,
+                        lastStampedIndex = lastStampedIndex,
                         onPlayPause = { viewModel.playPause() },
                         onSeek = { viewModel.seekTo(it) },
                         onSkipBackward = { viewModel.skipBackward() },
                         onSkipForward = { viewModel.skipForward() },
                         onSetPlaybackSpeed = { viewModel.setPlaybackSpeed(it) },
                         onStampCurrentLine = { viewModel.stampCurrentLine() },
+                        onInsertInstrumentalBreak = { viewModel.insertInstrumentalBreak() },
                         onSelectSyncIndex = { viewModel.setCurrentSyncIndex(it) },
                         onNudgeTimestamp = { idx, delta -> viewModel.nudgeTimestamp(idx, delta) },
                         onClearTimestamp = { viewModel.clearTimestamp(it) },

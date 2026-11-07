@@ -10,7 +10,6 @@ import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.AudioPlayerManager
-import com.example.audio.DemoAudioGenerator
 import com.example.audio.LocalMusicRepository
 import com.example.model.LocalAudioTrack
 import com.example.model.LrcUtils
@@ -54,6 +53,9 @@ class LrcStudioViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _currentSyncIndex = MutableStateFlow(0)
     val currentSyncIndex: StateFlow<Int> = _currentSyncIndex.asStateFlow()
+
+    private val _lastStampedIndex = MutableStateFlow<Int?>(null)
+    val lastStampedIndex: StateFlow<Int?> = _lastStampedIndex.asStateFlow()
 
     private val _localTracks = MutableStateFlow<List<LocalAudioTrack>>(emptyList())
     val localTracks: StateFlow<List<LocalAudioTrack>> = _localTracks.asStateFlow()
@@ -103,58 +105,26 @@ class LrcStudioViewModel(application: Application) : AndroidViewModel(applicatio
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), -1)
 
     init {
-        // Automatically prepare the demo melody so the app is instantly usable
-        loadDemoSong(showSnackbar = false)
+        // Projek dimulai dengan kondisi bersih tanpa lagu demo bawaan
+        resetProject()
     }
 
     fun setTab(tab: StudioTab) {
         _currentTab.value = tab
     }
 
-    fun loadDemoSong(showSnackbar: Boolean = true) {
-        viewModelScope.launch {
-            val context = getApplication<Application>()
-            val (uri, demoWaveform) = DemoAudioGenerator.getOrCreateDemoSong(context)
-            _songInfo.value = SongInfo(
-                title = "Melodi Senja (Demo)",
-                artist = "Lishrik Studio",
-                album = "Acoustic Beats",
-                durationMs = 36000L,
-                uri = uri,
-                isBuiltInDemo = true
-            )
-            playerManager.loadAudio(uri, demoWaveform)
-
-            // If lyrics are empty, load demo lyrics
-            if (_lyrics.value.isEmpty()) {
-                val demoText = """
-                    Selamat datang di Lishrik Studio
-                    Tempat membuat lirik berirama
-                    Dengarkan melodi yang mengalun
-                    Tekan tombol tepat pada nada
-                    Sinkronisasi presisi setiap kata
-                    Lihat gelombang audio berdetak
-                    Pratinjau lirik bagai karaoke
-                    Ekspor file lrc dengan sempurna
-                """.trimIndent()
-                setRawLyrics(demoText)
-            }
-
-            if (showSnackbar) {
-                _snackbarMessage.value = "Lagu contoh demo berhasil dimuat!"
-            }
-        }
-    }
-
     fun resetProject() {
+        playerManager.pause()
         playerManager.clearAudio()
         _songInfo.value = SongInfo()
         _lyrics.value = emptyList()
         _currentSyncIndex.value = 0
+        _lastStampedIndex.value = null
         _snackbarMessage.value = "Projek lagu berhasil dihapus. Silakan pilih atau masukkan lagu baru."
     }
 
     fun loadCustomAudio(uri: Uri, title: String?, artist: String?, album: String? = "") {
+        playerManager.pause()
         val cleanTitle = title?.ifBlank { "Lagu Pilihan" } ?: "Lagu Pilihan"
         val cleanArtist = artist?.ifBlank { "Artis Lokal" } ?: "Artis Lokal"
         _songInfo.value = SongInfo(
@@ -166,7 +136,7 @@ class LrcStudioViewModel(application: Application) : AndroidViewModel(applicatio
             isBuiltInDemo = false
         )
         playerManager.loadAudio(uri)
-        _snackbarMessage.value = "Audio berhasil dimuat: $cleanTitle"
+        _snackbarMessage.value = "Audio berhasil dimuat: $cleanTitle (Siap disinkronkan)"
     }
 
     fun updateMetadata(title: String, artist: String, album: String) {
@@ -184,7 +154,7 @@ class LrcStudioViewModel(application: Application) : AndroidViewModel(applicatio
             _localTracks.value = tracks
             _isLoadingMusic.value = false
             if (tracks.isEmpty()) {
-                _snackbarMessage.value = "Tidak ada file musik ditemukan di MediaStore. Anda bisa menggunakan pemilih file audio atau lagu demo."
+                _snackbarMessage.value = "Tidak ada file musik ditemukan di perangkat. Silakan gunakan tombol 'Pilih Berkas' audio."
             }
         }
     }
@@ -223,12 +193,14 @@ class LrcStudioViewModel(application: Application) : AndroidViewModel(applicatio
         }
         _lyrics.value = parsed
         _currentSyncIndex.value = 0
+        _lastStampedIndex.value = null
     }
 
     fun cleanEmptyLines() {
         val cleaned = _lyrics.value.filter { it.text.isNotBlank() }
         _lyrics.value = cleaned
         _currentSyncIndex.value = _currentSyncIndex.value.coerceIn(0, (cleaned.size - 1).coerceAtLeast(0))
+        _lastStampedIndex.value = null
         _snackbarMessage.value = "Baris kosong berhasil dibersihkan."
     }
 
@@ -239,14 +211,35 @@ class LrcStudioViewModel(application: Application) : AndroidViewModel(applicatio
             val currentMs = playerManager.currentPositionMs.value
             lines[index] = lines[index].copy(timestampMs = currentMs)
             _lyrics.value = lines
+            _lastStampedIndex.value = index
 
             triggerHapticFeedback()
 
-            // Advance to the next unsynced or next line
+            // Advance to the next line
             if (index < lines.size - 1) {
                 _currentSyncIndex.value = index + 1
             }
         }
+    }
+
+    fun insertInstrumentalBreak() {
+        val lines = _lyrics.value.toMutableList()
+        val currentMs = playerManager.currentPositionMs.value
+        val insertIndex = (_currentSyncIndex.value).coerceIn(0, lines.size)
+
+        val instrumentalLine = LyricLine(
+            text = LrcUtils.INSTRUMENTAL_TEXT,
+            timestampMs = currentMs,
+            isInstrumental = true
+        )
+
+        lines.add(insertIndex, instrumentalLine)
+        _lyrics.value = lines
+        _lastStampedIndex.value = insertIndex
+        // Target line berikutnya adalah lirik setelah jeda instrumental
+        _currentSyncIndex.value = (insertIndex + 1).coerceAtMost(lines.size - 1)
+        triggerHapticFeedback()
+        _snackbarMessage.value = "Jeda musik instrumental ditambahkan pada ${LrcUtils.formatDisplayTime(currentMs)}"
     }
 
     fun setCurrentSyncIndex(index: Int) {
