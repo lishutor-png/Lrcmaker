@@ -73,22 +73,16 @@ object LrcUtils {
     fun parseLyricsInput(input: String): List<LyricLine> {
         val lines = input.lines()
         val result = mutableListOf<LyricLine>()
-        val lrcRegex = Regex("""\[(\d{1,2}):(\d{2})[.:](\d{2,3})\](.*)""")
+        val lrcTimestampRegex = Regex("""^\[(\d{1,2}):(\d{2})[.:](\d{2,3})\](.*)""")
+        val fullBracketRegex = Regex("""^\[[^\]]*\]$""") // Baris yang seluruhnya berupa keterangan [ ... ]
+        val inlineBracketRegex = Regex("""\[[^\]]*\]""") // Keterangan [ ... ] di dalam lirik
 
         for (rawLine in lines) {
             val trimmed = rawLine.trim()
             if (trimmed.isEmpty()) continue
 
-            // Skip metadata tags like [ti:], [ar:], [al:], etc.
-            if (trimmed.startsWith("[ti:") || trimmed.startsWith("[ar:") ||
-                trimmed.startsWith("[al:") || trimmed.startsWith("[by:") ||
-                trimmed.startsWith("[offset:") || trimmed.startsWith("[re:") ||
-                trimmed.startsWith("[ve:")
-            ) {
-                continue
-            }
-
-            val match = lrcRegex.find(trimmed)
+            // 1. Cek apakah ini baris LRC timestamp resmi: [mm:ss.xx] teks
+            val match = lrcTimestampRegex.find(trimmed)
             if (match != null) {
                 val min = match.groupValues[1].toLongOrNull() ?: 0L
                 val sec = match.groupValues[2].toLongOrNull() ?: 0L
@@ -96,21 +90,54 @@ object LrcUtils {
                 val frac = fracStr.toLongOrNull() ?: 0L
                 val fracMs = if (fracStr.length == 2) frac * 10 else frac
                 val totalMs = (min * 60 + sec) * 1000 + fracMs
-                val lyricText = match.groupValues[4].trim()
+                var lyricText = match.groupValues[4].trim()
+
+                // Bersihkan keterangan dalam [ ] jika masih ada di teks lirik (misal [Intro], [Chorus])
+                lyricText = lyricText.replace(inlineBracketRegex, "").trim()
+
                 val isInst = lyricText.isEmpty() || lyricText.contains("♪") || lyricText.contains("instrumental", ignoreCase = true)
                 result.add(LyricLine(
                     text = if (lyricText.isEmpty()) INSTRUMENTAL_TEXT else lyricText,
                     timestampMs = totalMs,
                     isInstrumental = isInst
                 ))
-            } else {
-                val isInst = trimmed.contains("♪") || trimmed.contains("instrumental", ignoreCase = true)
-                result.add(LyricLine(
-                    text = trimmed,
-                    timestampMs = null,
-                    isInstrumental = isInst
-                ))
+                continue
             }
+
+            // 2. Lewati semua tag metadata LRC (ti, ar, al, by, offset, re, ve, dll.)
+            if (trimmed.startsWith("[ti:", ignoreCase = true) ||
+                trimmed.startsWith("[ar:", ignoreCase = true) ||
+                trimmed.startsWith("[al:", ignoreCase = true) ||
+                trimmed.startsWith("[by:", ignoreCase = true) ||
+                trimmed.startsWith("[offset:", ignoreCase = true) ||
+                trimmed.startsWith("[re:", ignoreCase = true) ||
+                trimmed.startsWith("[ve:", ignoreCase = true)
+            ) {
+                continue
+            }
+
+            // 3. Skip / abaikan baris yang seluruh isinya hanya keterangan di dalam [ ]
+            // Contoh: [Verse 1], [Chorus], [Intro], [Outro], [Bridge], [Instrumental], [Guitar Solo], dll.
+            if (fullBracketRegex.matches(trimmed)) {
+                // Jika keterangannya spesifik [Instrumental] / [Solo Gitar] / [Intro Musik],
+                // pengguna mungkin ingin ini sebagai baris jeda musik atau abaikan.
+                // Sesuai permintaan user: "buat teks yang di dalam [ ] tidak usah dibaca atau di skip, karena isinya hanya keterangan"
+                continue
+            }
+
+            // 4. Jika baris lirik biasa memiliki keterangan di dalam [ ] (misal: "Kugapai mimpiku [Chorus]" atau "[Lead] Kugapai mimpiku")
+            // Hapus bagian [ ... ] dari baris lirik tersebut agar liriknya bersih.
+            val cleanedText = trimmed.replace(inlineBracketRegex, "").trim()
+            if (cleanedText.isEmpty()) {
+                continue // Jika setelah dihapus [ ] baris menjadi kosong, skip baris ini
+            }
+
+            val isInst = cleanedText.contains("♪") || cleanedText.contains("instrumental", ignoreCase = true)
+            result.add(LyricLine(
+                text = cleanedText,
+                timestampMs = null,
+                isInstrumental = isInst
+            ))
         }
         return result
     }

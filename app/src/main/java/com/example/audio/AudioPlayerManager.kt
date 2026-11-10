@@ -62,6 +62,16 @@ class AudioPlayerManager(private val context: Context) {
                     _durationMs.value = mp.duration.toLong()
                     _isLoaded.value = true
                     applyPlaybackSpeed(_playbackSpeed.value)
+                    // Pastikan player tetap ter-pause setelah load
+                    try {
+                        if (mp.isPlaying) {
+                            mp.pause()
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    _isPlaying.value = false
+                    stopProgressTicker()
 
                     if (customWaveform != null && customWaveform.isNotEmpty()) {
                         _waveformBars.value = customWaveform
@@ -148,9 +158,20 @@ class AudioPlayerManager(private val context: Context) {
     private fun applyPlaybackSpeed(speed: Float) {
         try {
             mediaPlayer?.let { mp ->
+                val wasPlaying = _isPlaying.value
                 val params = mp.playbackParams ?: PlaybackParams()
                 params.speed = speed
                 mp.playbackParams = params
+                // Pada Android MediaPlayer, pemanggilan setPlaybackParams dengan non-zero speed
+                // secara otomatis memicu start() pada player. Jika status saat ini tidak playing,
+                // kita harus segera memanggil pause() agar tidak autoplay.
+                if (!wasPlaying) {
+                    try {
+                        mp.pause()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

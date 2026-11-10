@@ -531,7 +531,7 @@ fun SetupScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Ketik atau tempel lirik (teks biasa atau format .lrc yang sudah ada). Setiap baris akan menjadi satu poin sinkronisasi.",
+                    text = "Ketik atau tempel lirik. Keterangan dalam tanda kurung [ ] seperti [Verse], [Chorus], [Intro] otomatis diabaikan sehingga lirik tetap bersih dan siap disinkronkan.",
                     style = MaterialTheme.typography.bodySmall,
                     color = StudioTextSecondary
                 )
